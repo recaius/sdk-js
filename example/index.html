@@ -1,0 +1,143 @@
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>お試し</title>
+</head>
+
+<body>
+    <div>
+        <p>V5</p>
+    </div>
+    <div>
+        <label>トリガーキーワード(複数時はカンマ(",")で区切る
+            <input id="trigger-word" type="text" />
+        </label>
+    </div>
+    <div>
+        <label>Hook URL
+            <input id="hook-url" type="text" />
+        </label>
+    </div>
+    <div>
+        <p id="asr-result-text"></p>
+    </div>
+    <br />
+    <div>
+        <p id="status"></p>
+    </div>
+    <div>
+        <p id="trigger-status"></p>
+    </div>
+    <button id="start-button">スタート</button>
+    <script src="./recaius.js"></script>
+    <script>
+        // only use for DEMO
+        var ID = "xxxxxxxx";
+        var PASS = "xxxxxxx";
+
+        function setStatus(text) {
+            document.getElementById('status').textContent = text;
+            console.log("Status:", text);
+        }
+        function setTriggerStatus(text) {
+            document.getElementById('trigger-status').textContent = text;
+            console.log("Trigger status:", text);
+        }
+
+        function setResult(text) {
+            document.getElementById('asr-result-text').textContent = text;
+            CheckAndActivateTrigger(text)
+            console.log("ASR Result:", text);
+        }
+
+        function CheckAndActivateTrigger(text) {
+            let triggerCondition = document.getElementById('trigger-word').value;
+            if (triggerCondition.length === 0) {
+                return
+            }
+            let words = triggerCondition.split(',');
+            let hookURL = document.getElementById('hook-url').value;
+            for (var i = 0; i < words.length; i++) {
+                if (text.indexOf(words[i]) >= 0) {
+                    if (hookURL.length > 0) {
+                        fetch(hookURL)  // no tracing
+                        setTriggerStatus(`Call ${hookURL} !!`)
+                    }
+                    return
+                }
+            }
+        }
+
+        var recaius = new Recaius({
+            auth: {
+                speech_recog_jaJP: {
+                    service_id: ID,
+                    password: PASS
+                },
+                expiry_sec: 3600,
+            }
+        });
+        var session = null;
+        var mic = null;
+
+        recaius.auth.login()
+            .then(() => {
+                setStatus("ログイン成功")
+                return recaius.getMic()
+            })
+            .then(_mic => {
+                mic = _mic;
+                session = recaius.asr.newSession({
+                    inputType: 'linear/float32',
+                    sampleRate: mic.sampleRate(),
+                    sendInterval: 250  // 10の倍数を指定すること
+                })
+                // set event callbacks for "Result", "NoData", "Reject", "Failure", "SOS"
+                session.setCallback('Reject', () => setStatus("Your voice was rejected"))
+                session.setCallback('Failure', () => setStatus('ASR Failed'))
+                session.setCallback('SOS', () => setStatus('Received: start of speech'))
+                session.setCallback('Result', obj => setResult(`Result: ${obj}`))
+                session.setCallback('NoData', () => {
+                    session.stop().then(() => setStatus('No data: Session stopped'))
+                    // mic.stop()
+                    document.getElementById('start-button').textContent = 'スタート'
+                })
+                mic.onInput = (buf) => session.push(buf);
+                return mic.start()
+                    .then(() => setStatus('マイク準備完了'))
+            })
+            .catch(err => {
+                setStatus(err.stack)
+                return Promise.reject(err)
+            })
+
+        // Start!
+        document.getElementById('start-button').onclick = function (ev) {
+            let text = ev.target.textContent
+            if (text == 'スタート') {
+                ev.target.textContent = 'ストップ'
+                session.start({ model_id: 1, push_to_talk: true })
+                    //                 .then(() => mic.start())
+                    .catch(err => {
+                        setStatus(JSON.stringify(err))
+                        return Promise.reject(err)
+                    })
+            } else {
+                ev.target.textContent = 'スタート'
+                session.stop()
+                    //                 .then(() => mic.stop())
+                    .then(() => setStatus('Session stopped by button'))
+                    .catch(err => {
+                        setStatus(JSON.stringify(err))
+                        return Promise.reject(err)
+                    })
+            }
+        }
+
+    </script>
+</body>
+
+</html>

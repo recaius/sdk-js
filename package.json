@@ -1,0 +1,24 @@
+{
+  "name": "recaius",
+  "version": "1.0.0",
+  "description": "Recaius client library",
+  "main": "lib/index.js",
+  "scripts": {
+    "release": "webpack -p --progress",
+    "test": "node_modules/.bin/mocha --timeout=20000"
+  },
+  "author": "Hiroyuki Tanaka",
+  "license": "MIT",
+  "dependencies": {
+    "request": "^2.75.0"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.2",
+    "babel-preset-env": "^1.6.1",
+    "chai": "^3.5.0",
+    "chai-as-promised": "^6.0.0",
+    "mocha": "^3.1.2",
+    "webpack": "^3.10.0"
+  }
+}
